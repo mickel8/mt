@@ -1,7 +1,9 @@
-INT=eno1 
-DPORT=8989
-MASK=0xffff
-DELAY=5000ms
+#!/bin/fish
+
+set INT eno1 
+set DPORT 8989
+set MASK 0xffff
+set DELAY 5000ms
 
 tc qdisc add    \
     dev $INT    \
