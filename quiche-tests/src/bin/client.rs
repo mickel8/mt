@@ -30,6 +30,7 @@ extern crate log;
 use std::net::ToSocketAddrs;
 
 use ring::rand::*;
+use std::fs::File;
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
@@ -84,6 +85,7 @@ fn main() {
 
     // Create the configuration for the QUIC connection.
     let mut config = quiche::Config::new(quiche::PROTOCOL_VERSION).unwrap();
+    config.log_keys();
 
     // *CAUTION*: this should not be set to `false` in production!!!
     config.verify_peer(false);
@@ -110,7 +112,7 @@ fn main() {
 
     // Create a QUIC connection and initiate handshake.
     let mut conn = quiche::connect(url.domain(), &scid, &mut config).unwrap();
-
+    conn.set_keylog(Box::new(File::create("log.log").unwrap()));
     info!(
         "connecting to {:} from {:} with scid {}",
         peer_addr,
@@ -191,11 +193,11 @@ fn main() {
         // Send an HTTP request as soon as the connection is established.
         if conn.is_established() && !req_sent {
             info!("sending HTTP request for {}", url.path());
-
+            // info!("stream capacity: {}", conn.stream_capacity(HTTP_REQ_STREAM_ID).unwrap());
             let req = format!("GET {}\r\n", url.path());
             conn.stream_send(HTTP_REQ_STREAM_ID, req.as_bytes(), true)
                 .unwrap();
-
+            info!("stream capacity: {}", conn.stream_capacity(HTTP_REQ_STREAM_ID).unwrap());
             req_sent = true;
         }
 
@@ -216,6 +218,8 @@ fn main() {
                 print!("{}", unsafe {
                     std::str::from_utf8_unchecked(&stream_buf)
                 });
+
+                info!("stream capacity: {}", conn.stream_capacity(HTTP_REQ_STREAM_ID).unwrap());
 
                 // The server reported that it has no more data to send, which
                 // we got the full response. Close the connection.

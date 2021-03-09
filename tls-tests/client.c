@@ -11,6 +11,10 @@
 
 #include <time.h>
 
+void bit_dump(char *data, int size) {
+    
+}
+
 int main(int argc, char **argv) {
 
     if (argc != 4) {
@@ -65,7 +69,7 @@ int main(int argc, char **argv) {
 
     char *msg = "GET / HTTP/1.1\r\n"
         "Accept: text/html\r\n"
-        "Host: google.com\r\n"
+        "Host: www.google.com\r\n"
         "\r\n";
     int size = strlen(msg);
 
@@ -85,16 +89,23 @@ int main(int argc, char **argv) {
     }
 
     SSL_set_bio(ssl, rbio, wbio);
-    sleep(1);
 
     printf("Starting benchmark\n");
     clock_t start = clock();
     for(int i = 0; i < packets; i++) {
         bytes = SSL_write(ssl, msg, size);
-        if (bytes != 55) {
+        if (bytes != strlen(msg)) {
             printf("error\n");
             exit(EXIT_FAILURE);
         }
+        size_t pending = BIO_ctrl_pending(wbio);
+        printf("Pending data %d\n", pending);
+        bytes = BIO_read(wbio, buf, pending);
+        printf("Read %d pending data\n", bytes);
+        for (int i = 0; i < bytes; i++) {
+            printf("%d", buf[i]);
+        }
+        printf("\n");
     }
     clock_t end = clock();
     printf("Preaparing %d packets took: %f\n", packets, (float)(end-start) / CLOCKS_PER_SEC);

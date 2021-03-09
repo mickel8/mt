@@ -1,6 +1,18 @@
-#src
-src/main
+# lsquic-tests
+lsquic-tests/cmake-build-debug
+lsquic-tests/.idea
+lsquic-tests/cmake_install.cmake
+lsquic-tests/CMakeCache.txt
+lsquic-tests/echo_client
+lsquic-tests/echo_server
+lsquic-tests/lsquic_tests.cbp
+lsquic-tests/Makefile
+lsquic-tests/test_config.h
+lsquic-tests/CMakeFiles
 
-# tls
-tls/client
+# udp-tests
+udp-tests/main
+
+# tls-tests
+tls-tests/client
  
