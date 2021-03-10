@@ -47,8 +47,7 @@ struct Client {
     partial_responses: HashMap<u64, PartialResponse>,
 }
 
-type ClientMap =
-HashMap<quiche::ConnectionId<'static>, (net::SocketAddr, Client)>;
+type ClientMap = HashMap<quiche::ConnectionId<'static>, (net::SocketAddr, Client)>;
 
 fn main() {
     env_logger::init();
@@ -71,7 +70,7 @@ fn main() {
     let mut events = mio::Events::with_capacity(1024);
 
     // Create the UDP listening socket, and register it with the event loop.
-    let socket = net::UdpSocket::bind("127.0.0.2:4433").unwrap();
+    let socket = net::UdpSocket::bind("127.0.0.3:4433").unwrap();
 
     let socket = mio::net::UdpSocket::from_socket(socket).unwrap();
     poll.register(
@@ -80,17 +79,13 @@ fn main() {
         mio::Ready::readable(),
         mio::PollOpt::edge(),
     )
-        .unwrap();
+    .unwrap();
 
     // Create the configuration for the QUIC connections.
     let mut config = quiche::Config::new(quiche::PROTOCOL_VERSION).unwrap();
 
-    config
-        .load_cert_chain_from_pem_file("./cert.crt")
-        .unwrap();
-    config
-        .load_priv_key_from_pem_file("./cert.key")
-        .unwrap();
+    config.load_cert_chain_from_pem_file("./cert.crt").unwrap();
+    config.load_priv_key_from_pem_file("./cert.key").unwrap();
 
     config
         .set_application_protos(b"\x05hq-29\x05hq-28\x05hq-27\x08http/0.9")
@@ -101,7 +96,7 @@ fn main() {
     config.set_max_send_udp_payload_size(MAX_DATAGRAM_SIZE);
     config.set_initial_max_data(20_000_000);
     config.set_initial_max_stream_data_bidi_local(1_000_000);
-    config.set_initial_max_stream_data_bidi_remote(1_000_000);
+    config.set_initial_max_stream_data_bidi_remote(15_000);
     config.set_initial_max_stream_data_uni(1_000_000);
     config.set_initial_max_streams_bidi(100);
     config.set_initial_max_streams_uni(100);
@@ -109,8 +104,7 @@ fn main() {
     config.enable_early_data();
 
     let rng = SystemRandom::new();
-    let conn_id_seed =
-        ring::hmac::Key::generate(ring::hmac::HMAC_SHA256, &rng).unwrap();
+    let conn_id_seed = ring::hmac::Key::generate(ring::hmac::HMAC_SHA256, &rng).unwrap();
 
     let mut clients = ClientMap::new();
 
@@ -118,8 +112,7 @@ fn main() {
         // Find the shorter timeout from all the active connections.
         //
         // TODO: use event loop that properly supports timers
-        let timeout =
-            clients.values().filter_map(|(_, c)| c.conn.timeout()).min();
+        let timeout = clients.values().filter_map(|(_, c)| c.conn.timeout()).min();
 
         poll.poll(&mut events, timeout).unwrap();
 
@@ -149,7 +142,7 @@ fn main() {
                     }
 
                     panic!("recv() failed: {:?}", e);
-                },
+                }
             };
 
             debug!("got {} bytes", len);
@@ -157,16 +150,13 @@ fn main() {
             let pkt_buf = &mut buf[..len];
 
             // Parse the QUIC packet's header.
-            let hdr = match quiche::Header::from_slice(
-                pkt_buf,
-                quiche::MAX_CONN_ID_LEN,
-            ) {
+            let hdr = match quiche::Header::from_slice(pkt_buf, quiche::MAX_CONN_ID_LEN) {
                 Ok(v) => v,
 
                 Err(e) => {
                     error!("Parsing packet header failed: {:?}", e);
                     continue 'read;
-                },
+                }
             };
 
             trace!("got packet {:?}", hdr);
@@ -177,8 +167,7 @@ fn main() {
 
             // Lookup a connection based on the packet's connection ID. If there
             // is no connection matching, create a new one.
-            let (_, client) = if !clients.contains_key(&hdr.dcid) &&
-                !clients.contains_key(&conn_id)
+            let (_, client) = if !clients.contains_key(&hdr.dcid) && !clients.contains_key(&conn_id)
             {
                 if hdr.ty != quiche::Type::Initial {
                     error!("Packet is not Initial");
@@ -188,9 +177,7 @@ fn main() {
                 if !quiche::version_is_supported(hdr.version) {
                     warn!("Doing version negotiation");
 
-                    let len =
-                        quiche::negotiate_version(&hdr.scid, &hdr.dcid, &mut out)
-                            .unwrap();
+                    let len = quiche::negotiate_version(&hdr.scid, &hdr.dcid, &mut out).unwrap();
 
                     let out = &out[..len];
 
@@ -227,7 +214,7 @@ fn main() {
                         hdr.version,
                         &mut out,
                     )
-                        .unwrap();
+                    .unwrap();
 
                     let out = &out[..len];
 
@@ -262,8 +249,7 @@ fn main() {
 
                 debug!("New connection: dcid={:?} scid={:?}", hdr.dcid, scid);
 
-                let conn =
-                    quiche::accept(&scid, odcid.as_ref(), &mut config).unwrap();
+                let conn = quiche::accept(&scid, odcid.as_ref(), &mut config).unwrap();
 
                 let client = Client {
                     conn,
@@ -288,7 +274,7 @@ fn main() {
                 Err(e) => {
                     error!("{} recv failed: {:?}", client.conn.trace_id(), e);
                     continue 'read;
-                },
+                }
             };
 
             debug!("{} processed {} bytes", client.conn.trace_id(), read);
@@ -301,14 +287,8 @@ fn main() {
 
                 // Process all readable streams.
                 for s in client.conn.readable() {
-                    while let Ok((read, fin)) =
-                    client.conn.stream_recv(s, &mut buf)
-                    {
-                        debug!(
-                            "{} received {} bytes",
-                            client.conn.trace_id(),
-                            read
-                        );
+                    while let Ok((read, fin)) = client.conn.stream_recv(s, &mut buf) {
+                        debug!("{} received {} bytes", client.conn.trace_id(), read);
 
                         let stream_buf = &buf[..read];
 
@@ -320,7 +300,7 @@ fn main() {
                             fin
                         );
 
-                        handle_stream(client, s, stream_buf, "examples/root");
+                        handle_stream(client, s, stream_buf);
                     }
                 }
             }
@@ -337,14 +317,14 @@ fn main() {
                     Err(quiche::Error::Done) => {
                         debug!("{} done writing", client.conn.trace_id());
                         break;
-                    },
+                    }
 
                     Err(e) => {
                         error!("{} send failed: {:?}", client.conn.trace_id(), e);
 
                         client.conn.close(false, 0x1, b"fail").ok();
                         break;
-                    },
+                    }
                 };
 
                 // TODO: coalesce packets.
@@ -409,9 +389,7 @@ fn mint_token(hdr: &quiche::Header, src: &net::SocketAddr) -> Vec<u8> {
 ///
 /// Note that this function is only an example and doesn't do any cryptographic
 /// authenticate of the token. *It should not be used in production system*.
-fn validate_token<'a>(
-    src: &net::SocketAddr, token: &'a [u8],
-) -> Option<quiche::ConnectionId<'a>> {
+fn validate_token<'a>(src: &net::SocketAddr, token: &'a [u8]) -> Option<quiche::ConnectionId<'a>> {
     if token.len() < 6 {
         return None;
     }
@@ -437,55 +415,40 @@ fn validate_token<'a>(
 }
 
 /// Handles incoming HTTP/0.9 requests.
-fn handle_stream(client: &mut Client, stream_id: u64, buf: &[u8], root: &str) {
+fn handle_stream(client: &mut Client, stream_id: u64, buf: &[u8]) {
     let conn = &mut client.conn;
 
-    if buf.len() > 4 && &buf[..4] == b"GET " {
-        let uri = &buf[4..buf.len()];
-        let uri = String::from_utf8(uri.to_vec()).unwrap();
-        let uri = String::from(uri.lines().next().unwrap());
-        let uri = std::path::Path::new(&uri);
-        let mut path = std::path::PathBuf::from(root);
+    info!(
+        "{} got msg: {:?} on stream {}",
+        conn.trace_id(),
+        String::from_utf8(buf.to_vec()).unwrap(),
+        stream_id
+    );
 
-        for c in uri.components() {
-            if let std::path::Component::Normal(v) = c {
-                path.push(v)
-            }
-        }
+    let body = buf.to_vec();
 
-        info!(
-            "{} got GET request for {:?} on stream {}",
-            conn.trace_id(),
-            path,
-            stream_id
-        );
+    // info!(
+    //     "{} sending response of size {} on stream {}",
+    //     conn.trace_id(),
+    //     body.len(),
+    //     stream_id
+    // );
+    //
+    // let written = match conn.stream_send(stream_id, &body, false) {
+    //     Ok(v) => v,
+    //
+    //     Err(quiche::Error::Done) => 0,
+    //
+    //     Err(e) => {
+    //         error!("{} stream send failed {:?}", conn.trace_id(), e);
+    //         return;
+    //     }
+    // };
 
-        let body = std::fs::read(path.as_path())
-            .unwrap_or_else(|_| b"Not Found!\r\n".to_vec());
-
-        info!(
-            "{} sending response of size {} on stream {}",
-            conn.trace_id(),
-            body.len(),
-            stream_id
-        );
-
-        let written = match conn.stream_send(stream_id, &body, true) {
-            Ok(v) => v,
-
-            Err(quiche::Error::Done) => 0,
-
-            Err(e) => {
-                error!("{} stream send failed {:?}", conn.trace_id(), e);
-                return;
-            },
-        };
-
-        if written < body.len() {
-            let response = PartialResponse { body, written };
-            client.partial_responses.insert(stream_id, response);
-        }
-    }
+    // if written < body.len() {
+    //     let response = PartialResponse { body, written };
+    //     client.partial_responses.insert(stream_id, response);
+    // }
 }
 
 /// Handles newly writable streams.
@@ -511,7 +474,7 @@ fn handle_writable(client: &mut Client, stream_id: u64) {
 
             error!("{} stream send failed {:?}", conn.trace_id(), e);
             return;
-        },
+        }
     };
 
     resp.written += written;

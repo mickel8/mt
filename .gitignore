@@ -9,10 +9,13 @@ lsquic-tests/lsquic_tests.cbp
 lsquic-tests/Makefile
 lsquic-tests/test_config.h
 lsquic-tests/CMakeFiles
+lsquic-tests/*.keys
 
-# udp-tests
-udp-tests/main
+# quiche-tests
+quiche-tests/*.log
 
 # tls-tests
 tls-tests/client
- 
+
+# udp-tests
+udp-tests/main

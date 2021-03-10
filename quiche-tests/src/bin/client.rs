@@ -34,14 +34,16 @@ use std::fs::File;
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
-const HTTP_REQ_STREAM_ID: u64 = 4;
+const STREAM_ID: u64 = 0;
+
+const MAX_MSG: u32 = 20;
 
 fn main() {
     env_logger::init();
 
     let mut buf = [0; 65535];
     let mut out = [0; MAX_DATAGRAM_SIZE];
-
+    let mut msg_cnt = 0;
     let mut args = std::env::args();
 
     let cmd = &args.next().unwrap();
@@ -81,7 +83,7 @@ fn main() {
         mio::Ready::readable(),
         mio::PollOpt::edge(),
     )
-        .unwrap();
+    .unwrap();
 
     // Create the configuration for the QUIC connection.
     let mut config = quiche::Config::new(quiche::PROTOCOL_VERSION).unwrap();
@@ -165,7 +167,7 @@ fn main() {
                     }
 
                     panic!("recv() failed: {:?}", e);
-                },
+                }
             };
 
             debug!("got {} bytes", len);
@@ -177,7 +179,7 @@ fn main() {
                 Err(e) => {
                     error!("recv failed: {:?}", e);
                     continue 'read;
-                },
+                }
             };
 
             debug!("processed {} bytes", read);
@@ -191,14 +193,16 @@ fn main() {
         }
 
         // Send an HTTP request as soon as the connection is established.
-        if conn.is_established() && !req_sent {
-            info!("sending HTTP request for {}", url.path());
-            // info!("stream capacity: {}", conn.stream_capacity(HTTP_REQ_STREAM_ID).unwrap());
-            let req = format!("GET {}\r\n", url.path());
-            conn.stream_send(HTTP_REQ_STREAM_ID, req.as_bytes(), true)
-                .unwrap();
-            info!("stream capacity: {}", conn.stream_capacity(HTTP_REQ_STREAM_ID).unwrap());
-            req_sent = true;
+        if conn.is_established() && msg_cnt < MAX_MSG {
+            info!("sending msg");
+            let msg = "random stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom string";
+            let written_to_stream = conn.stream_send(STREAM_ID, msg.as_bytes(), false).unwrap();
+            info!("written to stream: {}", written_to_stream);
+            info!(
+                "stream capacity: {}",
+                conn.stream_capacity(STREAM_ID).unwrap()
+            );
+            msg_cnt +=1;
         }
 
         // Process all readable streams.
@@ -208,26 +212,19 @@ fn main() {
 
                 let stream_buf = &buf[..read];
 
-                debug!(
-                    "stream {} has {} bytes (fin? {})",
-                    s,
-                    stream_buf.len(),
-                    fin
+                debug!("stream {} has {} bytes (fin? {})", s, stream_buf.len(), fin);
+
+                info!("{}", unsafe { std::str::from_utf8_unchecked(&stream_buf) });
+
+                info!(
+                    "stream capacity: {}",
+                    conn.stream_capacity(STREAM_ID).unwrap()
                 );
-
-                print!("{}", unsafe {
-                    std::str::from_utf8_unchecked(&stream_buf)
-                });
-
-                info!("stream capacity: {}", conn.stream_capacity(HTTP_REQ_STREAM_ID).unwrap());
 
                 // The server reported that it has no more data to send, which
                 // we got the full response. Close the connection.
-                if s == HTTP_REQ_STREAM_ID && fin {
-                    info!(
-                        "response received in {:?}, closing...",
-                        req_start.elapsed()
-                    );
+                if s == STREAM_ID && fin {
+                    info!("response received in {:?}, closing...", req_start.elapsed());
 
                     conn.close(true, 0x00, b"kthxbye").unwrap();
                 }
@@ -243,14 +240,14 @@ fn main() {
                 Err(quiche::Error::Done) => {
                     debug!("done writing");
                     break;
-                },
+                }
 
                 Err(e) => {
                     error!("send failed: {:?}", e);
 
                     conn.close(false, 0x1, b"fail").ok();
                     break;
-                },
+                }
             };
 
             if let Err(e) = socket.send(&out[..write]) {
