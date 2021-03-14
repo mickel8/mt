@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
             printf("EMSGSIZE\n");
             break;
         default:
-            printf("error %d\n", ret);
+            printf("sent %d\n", ret);
     };
     return 0;
 }
