@@ -1,29 +1,23 @@
+use criterion::{criterion_group, criterion_main, Criterion};
+use crypto_tests::{encrypt_payload, encrypt_packet};
+use crypto_tests::MyNonce;
 use ring::aead::Aad;
 use ring::aead::BoundKey;
-use ring::aead::Nonce;
-use ring::aead::NonceSequence;
-use ring::aead::OpeningKey;
 use ring::aead::SealingKey;
 use ring::aead::UnboundKey;
 use ring::aead::{AES_128_GCM, NONCE_LEN};
-use ring::error::Unspecified;
 
-fn main() {
+pub fn criterion_benchmark(c: &mut Criterion) {
     let key_bytes = [
         10, 141, 102, 148, 37, 119, 128, 179, 47, 14, 68, 0, 205, 28, 26, 149,
     ];
     let nonce = MyNonce {
         nonce: [0; NONCE_LEN],
     };
-    let o_nonce = MyNonce {
-        nonce: [0; NONCE_LEN],
-    };
     let algorithm = &AES_128_GCM;
     let unbound_key = UnboundKey::new(&algorithm, &key_bytes).unwrap();
-    let o_unbound_key = UnboundKey::new(&algorithm, &key_bytes).unwrap();
     let mut key = SealingKey::<MyNonce>::new(unbound_key, nonce);
-    let mut o_key = OpeningKey::<MyNonce>::new(o_unbound_key, o_nonce);
-    let header = [
+    let mut header = vec![
         0x57, 0x25, 0xe7, 0x4f, 0x2d, 0x27, 0x5d, 0x12, 0x8b, 0x37, 0xb0, 0x47, 0x04, 0x16, 0x08,
         0xa1, 0x84, 0x23, 0x65, 0xdb, 0xfa, 0xe7,
     ];
@@ -85,19 +79,13 @@ fn main() {
         0x2c, 0xbb, 0x13, 0x96, 0x66, 0x41, 0xaf, 0x00, 0x70, 0xab, 0xae, 0xd5, 0xbf, 0x2f, 0x5d,
         0xe5, 0xa3, 0x50, 0x25,
     ];
-
-    println!("encrypting payload of len: {}", payload.len());
-    key.seal_in_place_append_tag(Aad::from(header), &mut payload).unwrap();
-    println!("ciphertext len: {}", payload.len());
-    o_key.open_in_place(Aad::from(header), &mut payload).unwrap();
+    c.bench_function("encrypt payload", |b| {
+        b.iter(|| encrypt_payload(&mut key, &mut header, &mut payload))
+    });
+    c.bench_function("encrypt packet", |b| {
+        b.iter(|| encrypt_packet(&mut key, &mut header, &mut payload))
+    });
 }
 
-struct MyNonce {
-    nonce: [u8; NONCE_LEN],
-}
-
-impl NonceSequence for MyNonce {
-    fn advance(&mut self) -> Result<Nonce, Unspecified> {
-        Ok(Nonce::assume_unique_for_key(self.nonce))
-    }
-}
+criterion_group!(benches, criterion_benchmark);
+criterion_main!(benches);

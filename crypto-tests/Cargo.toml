@@ -4,8 +4,10 @@ version = "0.1.0"
 authors = ["Michał Śledź <sledzson08@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 ring="0.16.20"
+criterion="0.3.4"
 
+[[bench]]
+name="encryption"
+harness=false

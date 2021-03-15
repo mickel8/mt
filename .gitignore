@@ -1,5 +1,6 @@
 # crypto-tests
 crypto-tests/target
+crypto-tests/.idea
 
 # lsquic-tests
 lsquic-tests/cmake-build-debug
