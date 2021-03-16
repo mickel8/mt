@@ -5,15 +5,14 @@ use ring::aead::SealingKey;
 use ring::aead::NONCE_LEN;
 use ring::error::Unspecified;
 
-pub fn encrypt_payload(key: &mut SealingKey<MyNonce>, header: &mut Vec<u8>, payload: &mut Vec<u8>) {
-    //println!("encrypting payload of len: {}", payload.len());
-    key.seal_in_place_append_tag(Aad::from(header), payload)
-        .unwrap();
+pub struct MyNonce {
+    pub nonce: [u8; NONCE_LEN],
 }
 
-pub fn encrypt_packet(key: &mut SealingKey<MyNonce>, header: &mut Vec<u8>, payload: &mut Vec<u8>) {
-    encrypt_payload(key, header, payload);
-    encrypt_hdr(header);
+impl NonceSequence for MyNonce {
+    fn advance(&mut self) -> Result<Nonce, Unspecified> {
+        Ok(Nonce::assume_unique_for_key(self.nonce))
+    }
 }
 
 pub fn encrypt_hdr(header: &mut Vec<u8>) {
@@ -34,12 +33,12 @@ pub fn encrypt_hdr(header: &mut Vec<u8>) {
     }
 }
 
-pub struct MyNonce {
-    pub nonce: [u8; NONCE_LEN],
+pub fn encrypt_payload(key: &mut SealingKey<MyNonce>, header: &mut Vec<u8>, payload: &mut Vec<u8>) {
+    key.seal_in_place_append_tag(Aad::from(header), payload)
+        .unwrap();
 }
 
-impl NonceSequence for MyNonce {
-    fn advance(&mut self) -> Result<Nonce, Unspecified> {
-        Ok(Nonce::assume_unique_for_key(self.nonce))
-    }
+pub fn encrypt_packet(key: &mut SealingKey<MyNonce>, header: &mut Vec<u8>, payload: &mut Vec<u8>) {
+    encrypt_payload(key, header, payload);
+    encrypt_hdr(header);
 }
