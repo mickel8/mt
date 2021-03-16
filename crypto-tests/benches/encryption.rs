@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Bencher, BenchmarkId, Criterion};
-use crypto_tests::{encrypt_hdr, encrypt_payload};
+use crypto_tests::{decrypt_payload, encrypt_hdr, encrypt_payload};
 use crypto_tests::{encrypt_packet, MyNonce};
-use ring::aead::BoundKey;
+use ring::aead::{BoundKey, OpeningKey};
 use ring::aead::SealingKey;
 use ring::aead::UnboundKey;
 use ring::aead::{AES_128_GCM, NONCE_LEN};
@@ -62,13 +62,60 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         );
     }
     group2.finish();
+
+    let o_nonce = MyNonce {
+        nonce: [0; NONCE_LEN],
+    };
+    let o_unbound_key = UnboundKey::new(&algorithm, &key_bytes).unwrap();
+    let mut o_key = OpeningKey::<MyNonce>::new(o_unbound_key, o_nonce);
+    let mut group3 = c.benchmark_group("payload encryption vs decryption");
+    let mut payloads = generate_data();
+    let mut encrypted_payloads = payloads.clone();
+    encrypt_payloads(&mut key, &mut header, &mut encrypted_payloads);
+    for i in 0..payloads.len() {
+        let payload = payloads.get(i).unwrap();
+        let encrypted_payload = encrypted_payloads.get(i).unwrap();
+        group3.bench_with_input(
+            BenchmarkId::new("payload encryption", payload.len()),
+            payload,
+            |b, payload| {
+                b.iter(|| {
+                    encrypt_payload(&mut key, header.clone().as_mut(), payload.clone().as_mut())
+                })
+            },
+        );
+        group3.bench_with_input(
+            BenchmarkId::new("payload decryption", payload.len()),
+            encrypted_payload,
+            |b, payload| {
+                b.iter(|| {
+                    decrypt_payload(
+                        &mut o_key,
+                        header.clone().as_mut(),
+                        encrypted_payload.clone().as_mut(),
+                    )
+                })
+            },
+        );
+    }
+    group3.finish();
 }
 
 fn generate_data() -> Vec<Vec<u8>> {
-    vec![100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+    vec![100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300]
         .into_iter()
         .map(|bytes| (0..bytes).map(|_| rand::random::<u8>()).collect())
         .collect()
+}
+
+fn encrypt_payloads(
+    key: &mut SealingKey<MyNonce>,
+    header: &mut Vec<u8>,
+    payloads: &mut Vec<Vec<u8>>,
+) {
+    payloads
+        .into_iter()
+        .for_each(|payload| encrypt_payload(key, header, payload));
 }
 
 criterion_group!(benches, criterion_benchmark);

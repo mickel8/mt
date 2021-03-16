@@ -2,6 +2,7 @@
 crypto-tests/target
 crypto-tests/.idea
 crypto-tests/Cargo.lock
+crypto-tests/criterion
 
 # lsquic-tests
 lsquic-tests/cmake-build-debug
