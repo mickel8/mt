@@ -31,10 +31,11 @@ use std::net::ToSocketAddrs;
 
 use ring::rand::*;
 use std::fs::File;
+use std::pin::Pin;
+
+use quiche::Connection;
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
-
-const STREAM_ID: u64 = 0;
 
 const MAX_MSG: u32 = 20;
 
@@ -137,8 +138,6 @@ fn main() {
 
     let req_start = std::time::Instant::now();
 
-    let mut req_sent = false;
-
     loop {
         poll.poll(&mut events, conn.timeout()).unwrap();
 
@@ -195,14 +194,9 @@ fn main() {
         // Send an HTTP request as soon as the connection is established.
         if conn.is_established() && msg_cnt < MAX_MSG {
             info!("sending msg");
-            let msg = "random stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom string";
-            let written_to_stream = conn.stream_send(STREAM_ID, msg.as_bytes(), false).unwrap();
-            info!("written to stream: {}", written_to_stream);
-            info!(
-                "stream capacity: {}",
-                conn.stream_capacity(STREAM_ID).unwrap()
-            );
-            msg_cnt +=1;
+            send_msg(&mut conn, 0);
+            send_msg(&mut conn, 4);
+            msg_cnt += 1;
         }
 
         // Process all readable streams.
@@ -216,14 +210,14 @@ fn main() {
 
                 info!("{}", unsafe { std::str::from_utf8_unchecked(&stream_buf) });
 
-                info!(
-                    "stream capacity: {}",
-                    conn.stream_capacity(STREAM_ID).unwrap()
-                );
+//                info!(
+//                    "stream capacity: {}",
+//                    conn.stream_capacity(STREAM_ID).unwrap()
+//                );
 
                 // The server reported that it has no more data to send, which
                 // we got the full response. Close the connection.
-                if s == STREAM_ID && fin {
+                if s == 0 && fin {
                     info!("response received in {:?}, closing...", req_start.elapsed());
 
                     conn.close(true, 0x00, b"kthxbye").unwrap();
@@ -267,6 +261,16 @@ fn main() {
             break;
         }
     }
+}
+
+fn send_msg(conn: &mut Pin<Box<Connection>>, stream_id: u64) {
+    let msg = "random stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom string";
+    let written_to_stream = conn.stream_send(stream_id, msg.as_bytes(), false).unwrap();
+    info!("written to stream: {}", written_to_stream);
+    info!(
+        "stream capacity: {}",
+        conn.stream_capacity(stream_id).unwrap()
+    );
 }
 
 fn hex_dump(buf: &[u8]) -> String {
