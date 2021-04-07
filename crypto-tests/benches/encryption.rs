@@ -1,9 +1,10 @@
 use criterion::{criterion_group, criterion_main, Bencher, BenchmarkId, Criterion};
 use crypto_tests::{decrypt_payload, encrypt_hdr, encrypt_payload};
 use crypto_tests::{encrypt_packet, MyNonce};
-use ring::aead::{BoundKey, OpeningKey};
+use ring::aead::quic::{HeaderProtectionKey, AES_128};
 use ring::aead::SealingKey;
 use ring::aead::UnboundKey;
+use ring::aead::{BoundKey, OpeningKey};
 use ring::aead::{AES_128_GCM, NONCE_LEN};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -20,7 +21,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         0x57, 0x25, 0xe7, 0x4f, 0x2d, 0x27, 0x5d, 0x12, 0x8b, 0x37, 0xb0, 0x47, 0x04, 0x16, 0x08,
         0xa1, 0x84, 0x23, 0x65, 0xdb, 0xfa, 0xe7,
     ];
-
+    let hp_key_bytes = [
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+        0x0f,
+    ];
+    let mut hp_key = HeaderProtectionKey::new(&AES_128, &hp_key_bytes).unwrap();
     let mut group = c.benchmark_group("payload vs packet encryption");
     for payload in generate_data().iter_mut() {
         group.bench_with_input(
@@ -28,7 +33,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             payload,
             |b, payload| {
                 b.iter(|| {
-                    encrypt_payload(&mut key, header.clone().as_mut(), payload.clone().as_mut())
+                    encrypt_payload(payload.clone().as_mut(), header.clone().as_mut(), &mut key)
                 })
             },
         );
@@ -37,7 +42,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             payload,
             |b, payload| {
                 b.iter(|| {
-                    encrypt_packet(&mut key, header.clone().as_mut(), payload.clone().as_mut())
+                    encrypt_packet(
+                        header.clone().as_mut(),
+                        payload.clone().as_mut(),
+                        &mut hp_key,
+                        &mut key,
+                    )
                 })
             },
         );
@@ -51,14 +61,14 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             payload,
             |b, payload| {
                 b.iter(|| {
-                    encrypt_payload(&mut key, header.clone().as_mut(), payload.clone().as_mut())
+                    encrypt_payload(payload.clone().as_mut(), header.clone().as_mut(), &mut key)
                 })
             },
         );
         group2.bench_with_input(
             BenchmarkId::new("header encryption", payload.len()),
             payload,
-            |b, payload| b.iter(|| encrypt_hdr(header.clone().as_mut())),
+            |b, payload| b.iter(|| encrypt_hdr(header.clone().as_mut(), payload, &mut hp_key)),
         );
     }
     group2.finish();
@@ -80,7 +90,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             payload,
             |b, payload| {
                 b.iter(|| {
-                    encrypt_payload(&mut key, header.clone().as_mut(), payload.clone().as_mut())
+                    encrypt_payload(payload.clone().as_mut(), header.clone().as_mut(), &mut key)
                 })
             },
         );
@@ -102,10 +112,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 }
 
 fn generate_data() -> Vec<Vec<u8>> {
-    vec![100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300]
-        .into_iter()
-        .map(|bytes| (0..bytes).map(|_| rand::random::<u8>()).collect())
-        .collect()
+    vec![
+        100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300,
+    ]
+    .into_iter()
+    .map(|bytes| (0..bytes).map(|_| rand::random::<u8>()).collect())
+    .collect()
 }
 
 fn encrypt_payloads(
@@ -115,7 +127,7 @@ fn encrypt_payloads(
 ) {
     payloads
         .into_iter()
-        .for_each(|payload| encrypt_payload(key, header, payload));
+        .for_each(|payload| encrypt_payload(payload, header, key));
 }
 
 criterion_group!(benches, criterion_benchmark);

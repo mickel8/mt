@@ -8,6 +8,8 @@ edition = "2018"
 ring="0.16.20"
 criterion="0.3.4"
 rand="0.8.3"
+block-modes="0.7.0"
+aes = "0.6.0"
 
 [[bench]]
 name="encryption"
