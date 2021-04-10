@@ -1,11 +1,10 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use crypto_tests::{decrypt_payload, encrypt_hdr, encrypt_payload};
-use crypto_tests::{encrypt_packet, MyNonce};
 use ring::aead::quic::{HeaderProtectionKey, AES_128};
 use ring::aead::SealingKey;
 use ring::aead::UnboundKey;
 use ring::aead::{BoundKey, OpeningKey};
 use ring::aead::{AES_128_GCM, NONCE_LEN};
+use rust_ct::{MyNonce, encrypt_payload, encrypt_packet, encrypt_hdr, decrypt_payload};
 
 fn get_header() -> Vec<u8> {
     vec![

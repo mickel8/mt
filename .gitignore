@@ -1,12 +1,12 @@
+*.idea/
+
 # crypto-tests
-crypto-tests/target
-crypto-tests/.idea
-crypto-tests/Cargo.lock
-crypto-tests/criterion
+crypto-tests/rust-ct/target
+crypto-tests/rust-ct/Cargo.lock
+crypto-tests/rust-ct/criterion
 
 # lsquic-tests
 lsquic-tests/cmake-build-debug
-lsquic-tests/.idea
 lsquic-tests/cmake_install.cmake
 lsquic-tests/CMakeCache.txt
 lsquic-tests/echo_client
