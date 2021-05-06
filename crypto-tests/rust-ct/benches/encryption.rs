@@ -8,7 +8,7 @@ use rust_ct::{MyNonce, encrypt_payload, encrypt_packet, encrypt_hdr, decrypt_pay
 
 fn get_header() -> Vec<u8> {
     vec![
-        0x57, 0x25, 0xe7, 0x4f, 0x2d, 0x27, 0x5d, 0x12, 0x8b, 0x37, 0xb0, 0x47, 0x04, 0x16, 0x08,
+        0x40, 0x25, 0xe7, 0x4f, 0x2d, 0x27, 0x5d, 0x12, 0x8b, 0x37, 0xb0, 0x47, 0x04, 0x16, 0x08,
         0xa1, 0x84, 0x23, 0x65, 0xdb, 0xfa, 0xe7,
     ]
 }
@@ -36,9 +36,11 @@ fn prepare_benchmark() -> (
     let hp_key_bytes = get_hp_key_bytes();
     let nonce = MyNonce {
         nonce: [0; NONCE_LEN],
+        counter: 0,
     };
     let o_nonce = MyNonce {
         nonce: [0; NONCE_LEN],
+        counter: 0,
     };
     let algorithm = &AES_128_GCM;
 
@@ -164,6 +166,6 @@ criterion_group!(
     benches,
     bench_payload_packet_enc,
     bench_header_payload_enc,
-    bench_payload_enc_dec
+    // bench_payload_enc_dec
 );
 criterion_main!(benches);

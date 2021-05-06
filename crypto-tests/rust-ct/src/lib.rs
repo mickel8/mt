@@ -8,10 +8,17 @@ use ring::error::Unspecified;
 
 pub struct MyNonce {
     pub nonce: [u8; NONCE_LEN],
+    pub counter: u64,
 }
 
 impl NonceSequence for MyNonce {
     fn advance(&mut self) -> Result<Nonce, Unspecified> {
+        // XOR the last bytes of the IV with the counter. This is equivalent to
+        // left-padding the counter with zero bytes.
+        for (a, b) in self.nonce[4..].iter_mut().zip(self.counter.to_be_bytes().iter()) {
+            *a ^= b;
+        }
+        self.counter +=1;
         Ok(Nonce::assume_unique_for_key(self.nonce))
     }
 }
@@ -72,7 +79,7 @@ mod tests {
             0x0e, 0x0f,
         ];
         let mut header = vec![
-            0x57, 0x25, 0xe7, 0x4f, 0x2d, 0x27, 0x5d, 0x12, 0x8b, 0x37, 0xb0, 0x47, 0x04, 0x16,
+            0x40, 0x25, 0xe7, 0x4f, 0x2d, 0x27, 0x5d, 0x12, 0x8b, 0x37, 0xb0, 0x47, 0x04, 0x16,
             0x08, 0xa1, 0x84, 0x23, 0x65, 0xdb, 0xfa, 0xe7,
         ];
         let mut hp_key = HeaderProtectionKey::new(&AES_128, &hp_key_bytes).unwrap();
@@ -88,9 +95,11 @@ mod tests {
         ];
         let nonce = MyNonce {
             nonce: [0; NONCE_LEN],
+            counter: 0,
         };
         let o_nonce = MyNonce {
             nonce: [0; NONCE_LEN],
+            counter: 0,
         };
         let algorithm = &AES_128_GCM;
         let unbound_key = UnboundKey::new(&algorithm, &key_bytes).unwrap();
@@ -98,7 +107,7 @@ mod tests {
         let mut key = SealingKey::<MyNonce>::new(unbound_key, nonce);
         let mut o_key = OpeningKey::<MyNonce>::new(o_unbound_key, o_nonce);
         let mut header = vec![
-            0x57, 0x25, 0xe7, 0x4f, 0x2d, 0x27, 0x5d, 0x12, 0x8b, 0x37, 0xb0, 0x47, 0x04, 0x16,
+            0x40, 0x25, 0xe7, 0x4f, 0x2d, 0x27, 0x5d, 0x12, 0x8b, 0x37, 0xb0, 0x47, 0x04, 0x16,
             0x08, 0xa1, 0x84, 0x23, 0x65, 0xdb, 0xfa, 0xe7,
         ];
         let mut ciphertext = payload.clone();
