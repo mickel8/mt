@@ -25,3 +25,7 @@ tls-tests/client
 
 # udp-tests
 udp-tests/main
+
+# tcp-tests
+tcp-tests/target
+
