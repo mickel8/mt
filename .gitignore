@@ -1,4 +1,5 @@
 *.idea/
+*.iml
 
 # crypto-tests
 crypto-tests/rust-ct/target

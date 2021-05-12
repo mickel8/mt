@@ -25,3 +25,5 @@ elixir_ct-*.tar
 
 # Temporary files for e.g. tests
 /tmp
+
+benchee/
