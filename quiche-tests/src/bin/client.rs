@@ -237,6 +237,11 @@ fn main() {
             }
         }
 
+        let mut dgram_buf = [0; 1000];
+        while let Ok(len) = conn.dgram_recv(&mut dgram_buf) {
+            info!("{} got {} bytes of DATAGRAM", conn.trace_id(), len);
+        }
+
         // Generate outgoing QUIC packets and send them on the UDP socket, until
         // quiche reports that there are no more packets to be sent.
         loop {

@@ -35,6 +35,9 @@ use ring::rand::*;
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
+const SEND_STREAM_RESPONSE: bool = false;
+const SEND_DGRAM_RESPONSE: bool = true;
+
 struct PartialResponse {
     body: Vec<u8>,
 
@@ -308,6 +311,14 @@ fn main() {
                 let mut dgram_buf = [0; 1000];
                 while let Ok(len) = client.conn.dgram_recv(&mut dgram_buf) {
                     info!("{} got {} bytes of DATAGRAM", client.conn.trace_id(), len);
+                    if SEND_DGRAM_RESPONSE {
+                        info!(
+                            "{} sending {} bytes of DATAGRAM",
+                            client.conn.trace_id(),
+                            len
+                        );
+                        client.conn.dgram_send(&dgram_buf[..len]).unwrap();
+                    }
                 }
             }
         }
@@ -420,34 +431,34 @@ fn validate_token<'a>(src: &net::SocketAddr, token: &'a [u8]) -> Option<quiche::
     Some(quiche::ConnectionId::from_ref(&token[..]))
 }
 
-fn handle_stream(client: &mut Client, stream_id: u64, _buf: &[u8]) {
+fn handle_stream(client: &mut Client, stream_id: u64, buf: &[u8]) {
     let conn = &mut client.conn;
     info!("{} got msg: {:?} on stream", conn.trace_id(), stream_id);
 
-    // let body = buf.to_vec();
+    if SEND_STREAM_RESPONSE {
+        info!(
+            "{} sending response of size {} on stream {}",
+            conn.trace_id(),
+            buf.len(),
+            stream_id
+        );
 
-    // info!(
-    //     "{} sending response of size {} on stream {}",
-    //     conn.trace_id(),
-    //     body.len(),
-    //     stream_id
-    // );
-    //
-    // let written = match conn.stream_send(stream_id, &body, false) {
-    //     Ok(v) => v,
-    //
-    //     Err(quiche::Error::Done) => 0,
-    //
-    //     Err(e) => {
-    //         error!("{} stream send failed {:?}", conn.trace_id(), e);
-    //         return;
-    //     }
-    // };
+        let _written = match conn.stream_send(stream_id, buf, false) {
+            Ok(v) => v,
 
-    // if written < body.len() {
-    //     let response = PartialResponse { body, written };
-    //     client.partial_responses.insert(stream_id, response);
-    // }
+            Err(quiche::Error::Done) => 0,
+
+            Err(e) => {
+                error!("{} stream send failed {:?}", conn.trace_id(), e);
+                return;
+            }
+        };
+
+        // if written < body.len() {
+        //     let response = PartialResponse { body, written };
+        //     client.partial_responses.insert(stream_id, response);
+        // }
+    }
 }
 
 /// Handles newly writable streams.
