@@ -102,6 +102,7 @@ fn main() {
     config.set_initial_max_streams_uni(100);
     config.set_disable_active_migration(true);
     config.enable_early_data();
+    config.enable_dgram(true, 1000, 1000);
 
     let rng = SystemRandom::new();
     let conn_id_seed = ring::hmac::Key::generate(ring::hmac::HMAC_SHA256, &rng).unwrap();
@@ -303,6 +304,11 @@ fn main() {
                         handle_stream(client, s, stream_buf);
                     }
                 }
+
+                let mut dgram_buf = [0; 1000];
+                while let Ok(len) = client.conn.dgram_recv(&mut dgram_buf) {
+                    info!("{} got {} bytes of DATAGRAM", client.conn.trace_id(), len);
+                }
             }
         }
 
@@ -414,18 +420,11 @@ fn validate_token<'a>(src: &net::SocketAddr, token: &'a [u8]) -> Option<quiche::
     Some(quiche::ConnectionId::from_ref(&token[..]))
 }
 
-/// Handles incoming HTTP/0.9 requests.
-fn handle_stream(client: &mut Client, stream_id: u64, buf: &[u8]) {
+fn handle_stream(client: &mut Client, stream_id: u64, _buf: &[u8]) {
     let conn = &mut client.conn;
+    info!("{} got msg: {:?} on stream", conn.trace_id(), stream_id);
 
-    info!(
-        "{} got msg: {:?} on stream {}",
-        conn.trace_id(),
-        String::from_utf8(buf.to_vec()).unwrap(),
-        stream_id
-    );
-
-    let body = buf.to_vec();
+    // let body = buf.to_vec();
 
     // info!(
     //     "{} sending response of size {} on stream {}",

@@ -37,7 +37,14 @@ use quiche::Connection;
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
 
-const MAX_MSG: u32 = 20;
+const SEND_STREAM: bool = false;
+const SEND_DGRAM: bool = true;
+const STREAMS: [u64; 1] = [0];
+const STREAM_MSG_NUM: u32 = 1;
+const STREAM_MSG_SIZE: u32 = 800;
+const DGRAM_MSG_NUM: u32 = 1;
+const DGRAM_MSG_SIZE: u32 = 800;
+const MSG_ITERATIONS: u32 = 20;
 
 fn main() {
     env_logger::init();
@@ -106,6 +113,7 @@ fn main() {
     config.set_initial_max_streams_bidi(100);
     config.set_initial_max_streams_uni(100);
     config.set_disable_active_migration(true);
+    config.enable_dgram(true, 1000, 1000);
 
     // Generate a random source connection ID for the connection.
     let mut scid = [0; quiche::MAX_CONN_ID_LEN];
@@ -191,11 +199,22 @@ fn main() {
             break;
         }
 
-        // Send an HTTP request as soon as the connection is established.
-        if conn.is_established() && msg_cnt < MAX_MSG {
+        if conn.is_established() && msg_cnt < MSG_ITERATIONS {
             info!("sending msg");
-            send_msg(&mut conn, 0);
-            send_msg(&mut conn, 4);
+            if SEND_STREAM {
+                let msg = generate_msg(STREAM_MSG_SIZE);
+                for stream in STREAMS.iter() {
+                    for _ in 0..STREAM_MSG_NUM {
+                        send_msg(&mut conn, *stream, &msg);
+                    }
+                }
+            }
+            if SEND_DGRAM {
+                let msg = generate_msg(DGRAM_MSG_SIZE);
+                for _ in 0..DGRAM_MSG_NUM {
+                    send_dgram(&mut conn, &msg)
+                }
+            }
             msg_cnt += 1;
         }
 
@@ -207,13 +226,6 @@ fn main() {
                 let stream_buf = &buf[..read];
 
                 debug!("stream {} has {} bytes (fin? {})", s, stream_buf.len(), fin);
-
-                info!("{}", unsafe { std::str::from_utf8_unchecked(&stream_buf) });
-
-//                info!(
-//                    "stream capacity: {}",
-//                    conn.stream_capacity(STREAM_ID).unwrap()
-//                );
 
                 // The server reported that it has no more data to send, which
                 // we got the full response. Close the connection.
@@ -263,14 +275,19 @@ fn main() {
     }
 }
 
-fn send_msg(conn: &mut Pin<Box<Connection>>, stream_id: u64) {
-    let msg = "random stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom stringrandom string";
-    let written_to_stream = conn.stream_send(stream_id, msg.as_bytes(), false).unwrap();
+fn send_msg(conn: &mut Pin<Box<Connection>>, stream_id: u64, msg: &[u8]) {
+    let written_to_stream = conn.stream_send(stream_id, msg, false).unwrap();
     info!("written to stream: {}", written_to_stream);
-    info!(
-        "stream capacity: {}",
-        conn.stream_capacity(stream_id).unwrap()
-    );
+    let stream_capacity = conn.stream_capacity(stream_id).unwrap();
+    info!("stream capacity: {}", stream_capacity);
+}
+
+fn send_dgram(conn: &mut Pin<Box<Connection>>, msg: &[u8]) {
+    conn.dgram_send(msg).unwrap();
+}
+
+fn generate_msg(size: u32) -> Vec<u8> {
+    (0..size).map(|_| rand::random::<u8>()).collect()
 }
 
 fn hex_dump(buf: &[u8]) -> String {
