@@ -122,7 +122,21 @@ fn main() {
     let scid = quiche::ConnectionId::from_ref(&scid);
 
     // Create a QUIC connection and initiate handshake.
-    let mut conn = quiche::connect(url.domain(), &scid, &mut config).unwrap();
+    let mut conn = quiche::connect(url.domain(), &scid, peer_addr, &mut config).unwrap();
+    // Only bother with qlog if the user specified it.
+    #[cfg(feature = "qlog")]
+    {
+        if let Some(dir) = std::env::var_os("QLOGDIR") {
+            let id = format!("{:?}", scid);
+            let writer = make_qlog_writer(&dir, "client", &id);
+
+            conn.set_qlog(
+                std::boxed::Box::new(writer),
+                "quiche-client qlog".to_string(),
+                format!("{} id={}", "quiche-client qlog", id),
+            );
+        }
+    }
     conn.set_keylog(Box::new(File::create("log.log").unwrap()));
     info!(
         "connecting to {:} from {:} with scid {}",
@@ -131,7 +145,7 @@ fn main() {
         hex_dump(&scid)
     );
 
-    let write = conn.send(&mut out).expect("initial send failed");
+    let (write, _send_info) = conn.send(&mut out).expect("initial send failed");
 
     while let Err(e) = socket.send(&out[..write]) {
         if e.kind() == std::io::ErrorKind::WouldBlock {
@@ -162,7 +176,7 @@ fn main() {
                 break 'read;
             }
 
-            let len = match socket.recv(&mut buf) {
+            let (len, from) = match socket.recv_from(&mut buf) {
                 Ok(v) => v,
 
                 Err(e) => {
@@ -179,8 +193,9 @@ fn main() {
 
             debug!("got {} bytes", len);
 
+            let recv_info = quiche::RecvInfo { from };
             // Process potentially coalesced packets.
-            let read = match conn.recv(&mut buf[..len]) {
+            let read = match conn.recv(&mut buf[..len], recv_info) {
                 Ok(v) => v,
 
                 Err(e) => {
@@ -245,7 +260,7 @@ fn main() {
         // Generate outgoing QUIC packets and send them on the UDP socket, until
         // quiche reports that there are no more packets to be sent.
         loop {
-            let write = match conn.send(&mut out) {
+            let (write, _send_info) = match conn.send(&mut out) {
                 Ok(v) => v,
 
                 Err(quiche::Error::Done) => {
@@ -299,4 +314,23 @@ fn hex_dump(buf: &[u8]) -> String {
     let vec: Vec<String> = buf.iter().map(|b| format!("{:02x}", b)).collect();
 
     vec.join("")
+}
+
+pub fn make_qlog_writer(
+    dir: &std::ffi::OsStr,
+    role: &str,
+    _id: &str,
+) -> std::io::BufWriter<std::fs::File> {
+    let mut path = std::path::PathBuf::from(dir);
+    let filename = format!("{}.qlog", role);
+    path.push(filename);
+
+    match std::fs::File::create(&path) {
+        Ok(f) => std::io::BufWriter::new(f),
+
+        Err(e) => panic!(
+            "Error creating qlog file attempted path was {:?}: {}",
+            path, e
+        ),
+    }
 }

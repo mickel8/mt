@@ -253,7 +253,22 @@ fn main() {
 
                 debug!("New connection: dcid={:?} scid={:?}", hdr.dcid, scid);
 
-                let conn = quiche::accept(&scid, odcid.as_ref(), &mut config).unwrap();
+                let mut conn = quiche::accept(&scid, odcid.as_ref(), src, &mut config).unwrap();
+
+                // Only bother with qlog if the user specified it.
+                #[cfg(feature = "qlog")]
+                {
+                    if let Some(dir) = std::env::var_os("QLOGDIR") {
+                        let id = format!("{:?}", &scid);
+                        let writer = make_qlog_writer(&dir, "server", &id);
+
+                        conn.set_qlog(
+                            std::boxed::Box::new(writer),
+                            "quiche-server qlog".to_string(),
+                            format!("{} id={}", "quiche-server qlog", id),
+                        );
+                    }
+                }
 
                 let client = Client {
                     conn,
@@ -271,8 +286,9 @@ fn main() {
                 }
             };
 
+            let recv_info = quiche::RecvInfo { from: src };
             // Process potentially coalesced packets.
-            let read = match client.conn.recv(pkt_buf) {
+            let read = match client.conn.recv(pkt_buf, recv_info) {
                 Ok(v) => v,
 
                 Err(e) => {
@@ -328,7 +344,7 @@ fn main() {
         // packets to be sent.
         for (peer, client) in clients.values_mut() {
             loop {
-                let write = match client.conn.send(&mut out) {
+                let (write, _send_info) = match client.conn.send(&mut out) {
                     Ok(v) => v,
 
                     Err(quiche::Error::Done) => {
@@ -491,5 +507,24 @@ fn handle_writable(client: &mut Client, stream_id: u64) {
 
     if resp.written == resp.body.len() {
         client.partial_responses.remove(&stream_id);
+    }
+}
+
+pub fn make_qlog_writer(
+    dir: &std::ffi::OsStr,
+    role: &str,
+    _id: &str,
+) -> std::io::BufWriter<std::fs::File> {
+    let mut path = std::path::PathBuf::from(dir);
+    let filename = format!("{}.qlog", role);
+    path.push(filename);
+
+    match std::fs::File::create(&path) {
+        Ok(f) => std::io::BufWriter::new(f),
+
+        Err(e) => panic!(
+            "Error creating qlog file attempted path was {:?}: {}",
+            path, e
+        ),
     }
 }

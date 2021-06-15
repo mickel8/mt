@@ -20,6 +20,7 @@ lsquic-tests/*.keys
 
 # quiche-tests
 quiche-tests/*.log
+quiche-tests/*.qlog
 
 # tls-tests
 tls-tests/client

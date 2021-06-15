@@ -5,10 +5,14 @@ authors = ["Michał Śledź <sledzson08@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-quiche="0.7.0"
+quiche="0.9.0"
 log="0.4.14"
 ring="0.16.20"
 mio="0.6"
 url="1"
 env_logger = "0.8.3"
 rand="0.8.3"
+
+[features]
+qlog = ["quiche/qlog"]
+default = ["qlog"]
