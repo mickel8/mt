@@ -379,10 +379,12 @@ fn main() {
             debug!("Collecting garbage");
 
             if c.conn.is_closed() {
+                let stats = c.conn.stats();
                 info!(
-                    "{} connection collected {:?}",
+                    "{} connection collected {:?}, retrans {}",
                     c.conn.trace_id(),
-                    c.conn.stats()
+                    stats,
+                    stats.retrans
                 );
             }
 

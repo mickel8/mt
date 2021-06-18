@@ -210,7 +210,8 @@ fn main() {
         debug!("done reading");
 
         if conn.is_closed() {
-            info!("connection closed, {:?}", conn.stats());
+            let stats = conn.stats();
+            info!("connection closed, {:?}, {}", stats, stats.retrans);
             break;
         }
 
@@ -289,7 +290,8 @@ fn main() {
         }
 
         if conn.is_closed() {
-            info!("connection closed, {:?}", conn.stats());
+            let stats = conn.stats();
+            info!("connection closed, {:?}, retrans: {}", stats, stats.retrans);
             break;
         }
     }

@@ -5,7 +5,7 @@ authors = ["Michał Śledź <sledzson08@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-quiche="0.9.0"
+quiche= { git = "https://github.com/cloudflare/quiche" }
 log="0.4.14"
 ring="0.16.20"
 mio="0.6"

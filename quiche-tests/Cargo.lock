@@ -339,8 +339,7 @@ dependencies = [
 [[package]]
 name = "qlog"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8777d5490145d6907198d48b3a907447689ce80e071b3d8a16a9d9fb3df02bc1"
+source = "git+https://github.com/cloudflare/quiche#fd2c866c80bad1d2aea0f2e34d13d6bb8b0824a6"
 dependencies = [
  "serde",
  "serde_derive",
@@ -351,8 +350,7 @@ dependencies = [
 [[package]]
 name = "quiche"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9aaba1ba80a42d3da61d90133cedd00e8dfd4a6fe1d01128956de95dc2aaa4e2"
+source = "git+https://github.com/cloudflare/quiche#fd2c866c80bad1d2aea0f2e34d13d6bb8b0824a6"
 dependencies = [
  "cmake",
  "lazy_static",
